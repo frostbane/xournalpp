@@ -9,7 +9,7 @@ if(MACOSX)
     # or similar.
     # By default @rpath would only be set with make install.
     # Hence it needs to be set during build already.
-    # In case this affects installs on MACOSX in a negative way 
+    # In case this affects installs on MACOSX in a negative way
     #
     #     set(CMAKE_BUILD_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
     #
@@ -61,6 +61,7 @@ else ()
     )
   endif ()
 
+  set_target_properties(GTest::Main PROPERTIES IMPORTED_GLOBAL TRUE)
   add_library(gtest_main ALIAS GTest::Main)
 endif ()
 
