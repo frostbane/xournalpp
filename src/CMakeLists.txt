@@ -9,7 +9,7 @@ cmake_policy(VERSION 3.13)
 ##############################
 
 add_library(defaults INTERFACE)
-target_compile_options(defaults INTERFACE -Wall -Wreturn-type -Wuninitialized -Wunused-value -Wunused-variable -Wconversion)
+target_compile_options(defaults INTERFACE -Wall -Wreturn-type -Wuninitialized -Wunused-value -Wunused-variable)
 target_include_directories(defaults INTERFACE ${PROJECT_BINARY_DIR}/src)
 add_library(xoj::defaults ALIAS defaults)
 if (MSVC)
@@ -87,7 +87,7 @@ if (WIN32)
   unset(ICON_DEPS)
   add_custom_target(xournalpp_icon DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/win32/xournalpp.ico)
   add_dependencies(xournalpp xournalpp_icon)
-  
+
   # windows specific source files
   file (GLOB xournalpp-sources-win32 exe/win32/*.cpp exe/win32/*.h)
   target_sources(xournalpp PRIVATE ${xournalpp-sources-win32})
