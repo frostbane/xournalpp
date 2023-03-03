@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <iostream>
 
 #include <cairo.h>
 
@@ -23,7 +24,10 @@ std::string getSurfaceTypeName(cairo_surface_t*);
 
 Mask::Mask(cairo_surface_t* target, const Range& extent, double zoom, int dpiScaling, cairo_content_t contentType) {
     assert(target);
-    assert(extent.isValid());
+    assert(extent.isValid() ||
+           ((std::cout << "Invalid range in Mask(): X  " << extent.minX << " -- " << extent.maxX << std::endl
+                       << "                         Y  " << extent.minY << " -- " << extent.maxY << std::endl) &&
+            false));
     assert(zoom > 0.0);
     assert(dpiScaling > 0);
 
@@ -87,6 +91,14 @@ void Mask::wipe() {
         cairo_set_source_rgba(cr.get(), 1.0, 0.0, 0.0, 0.3);
         cairo_paint(cr.get());
     });
+}
+
+void Mask::wipeRange(const Range& rg) {
+    assert(isInitialized());
+    xoj::util::CairoSaveGuard saveGuard(cr.get());
+    cairo_rectangle(cr.get(), rg.minX, rg.minY, rg.getWidth(), rg.getHeight());
+    cairo_clip(cr.get());
+    wipe();
 }
 
 void Mask::reset() { cr.reset(); }

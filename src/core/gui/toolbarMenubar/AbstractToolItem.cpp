@@ -20,6 +20,10 @@ AbstractToolItem::~AbstractToolItem() {
     }
 }
 
+auto AbstractToolItem::getItem() const -> GtkToolItem* {
+    return this->item;
+}
+
 void AbstractToolItem::selected(ActionGroup group, ActionType action) {
     if (this->item == nullptr) {
         return;
@@ -54,7 +58,7 @@ void AbstractToolItem::toolButtonCallback(GtkToolButton* toolbutton, AbstractToo
         item->toolToggleButtonActive = selected;
     }
 
-    item->activated(nullptr, nullptr, toolbutton);
+    item->activated(nullptr, toolbutton);
 }
 
 auto AbstractToolItem::createItem(bool horizontal) -> GtkToolItem* {

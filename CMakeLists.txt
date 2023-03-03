@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.12)
 cmake_policy(VERSION ${CMAKE_VERSION})
+## The CMAKE_OSX_DEPLOYMENT_TARGET must be set before project(), so don't move the following line further down.
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version" FORCE)
 
 ## Project related Variables
 ## Also update changelog in debian folder!
 project(xournalpp
-        VERSION 1.1.2
+        VERSION 1.1.3
         DESCRIPTION "Xournal++ - Open source hand note-taking program"
         HOMEPAGE_URL "https://xournalpp.github.io/"
         LANGUAGES CXX C)
@@ -16,7 +18,6 @@ set(xournalpp_VERSION ${PROJECT_VERSION})
 set(CMAKE_PROJECT_VERSION ${PROJECT_VERSION})
 set(PROJECT_CONTACT "core.xournalpp@github.com")
 
-
 ## CMAKE_Variables
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/find" "${PROJECT_SOURCE_DIR}/cmake/include")
 set(CMAKE_CXX_STANDARD 17)
@@ -27,6 +28,17 @@ set_directory_properties(PROPERTIES EP_BASE "${PROJECT_BINARY_DIR}/external")
 
 add_definitions(-D_USE_MATH_DEFINES)
 add_definitions(-DGDK_DISABLE_DEPRECATED -DGTK_DISABLE_DEPRECATED)
+
+include(CheckCXXCompilerFlag)
+if (CMAKE_GENERATOR STREQUAL "Ninja")
+    CHECK_CXX_COMPILER_FLAG("-fcolor-diagnostics" CLANG_HAS_COLOR)
+    CHECK_CXX_COMPILER_FLAG("-fdiagnostics-color=always" GNU_HAS_COLOR)
+    if(CLANG_HAS_COLOR)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
+    elseif(GNU_HAS_COLOR)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
+    endif()
+endif()
 
 # package version
 include(Version)

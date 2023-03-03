@@ -24,6 +24,7 @@ using std::string;
 ToolbarAdapter::ToolbarAdapter(GtkWidget* toolbar, string toolbarName, ToolMenuHandler* toolHandler,
                                MainWindow* window) {
     this->w = toolbar;
+    g_object_ref(this->w);
     this->toolbarName = std::move(toolbarName);
     this->toolHandler = toolHandler;
     this->window = window;
@@ -53,6 +54,8 @@ ToolbarAdapter::~ToolbarAdapter() {
 
     GtkStyleContext* ctx = gtk_widget_get_style_context(w);
     gtk_style_context_remove_class(ctx, "editing");
+
+    g_object_unref(this->w);
 }
 
 void ToolbarAdapter::cleanupToolbars() {
@@ -81,8 +84,11 @@ void ToolbarAdapter::cleanToolItem(GtkToolItem* it) {
     if (data) {
         gtk_widget_set_sensitive(GTK_WIDGET(it), ToolitemDragDrop::isToolItemEnabled(data));
     }
+    GdkWindow* window = gtk_widget_get_window(GTK_WIDGET(it));
 
-    gdk_window_set_cursor(gtk_widget_get_window(GTK_WIDGET(it)), nullptr);
+    if (window) {
+        gdk_window_set_cursor(window, nullptr);
+    }
 
     gtk_tool_item_set_use_drag_window(it, false);
     gtk_drag_source_unset(GTK_WIDGET(it));
@@ -228,8 +234,9 @@ auto ToolbarAdapter::toolbarDragMotionCb(GtkToolbar* toolbar, GdkDragContext* co
     }
 
     if (d->type == TOOL_ITEM_ITEM) {
-        gtk_toolbar_set_drop_highlight_item(toolbar, d->item->createTmpItem(orientation == GTK_ORIENTATION_HORIZONTAL),
-                                            ipos);
+        GtkWidget* iconWidget = d->item->getNewToolIcon();
+        GtkToolItem* it = gtk_tool_button_new(iconWidget, "");
+        gtk_toolbar_set_drop_highlight_item(toolbar, it, ipos);
     } else if (d->type == TOOL_ITEM_SEPARATOR) {
         GtkToolItem* it = gtk_separator_tool_item_new();
         gtk_toolbar_set_drop_highlight_item(toolbar, it, ipos);

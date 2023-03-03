@@ -43,6 +43,11 @@ using std::string;
         error = g_error_new(G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, __VA_ARGS__); \
     }
 
+namespace {
+    constexpr size_t MAX_VERSION_LENGTH = 50;
+    constexpr size_t MAX_MIMETYPE_LENGTH = 25;
+}
+
 LoadHandler::LoadHandler():
         attachedPdfMissing(false),
         removePdfBackgroundFlag(false),
@@ -105,7 +110,7 @@ auto LoadHandler::getLastError() -> string { return this->lastError; }
 
 auto LoadHandler::isAttachedPdfMissing() const -> bool { return this->attachedPdfMissing; }
 
-auto LoadHandler::getMissingPdfFilename() -> string { return this->pdfMissing; }
+auto LoadHandler::getMissingPdfFilename() const -> string { return this->pdfMissing; }
 
 void LoadHandler::removePdfBackground() { this->removePdfBackgroundFlag = true; }
 
@@ -134,9 +139,9 @@ auto LoadHandler::openFile(fs::path const& filepath) -> bool {
                     FS(_F("The file is no valid .xopp file (Mimetype missing): \"{1}\"") % filepath.u8string());
             return false;
         }
-        char mimetype[25];
+        char mimetype[MAX_MIMETYPE_LENGTH + 1] = {};
         // read the mimetype and a few more bytes to make sure we do not only read a subset
-        zip_fread(mimetypeFp, mimetype, 25);
+        zip_fread(mimetypeFp, mimetype, MAX_MIMETYPE_LENGTH);
         if (!strcmp(mimetype, "application/xournal++")) {
             zip_fclose(mimetypeFp);
             this->lastError = FS(_F("The file is no valid .xopp file (Mimetype wrong): \"{1}\"") % filepath.u8string());
@@ -151,8 +156,8 @@ auto LoadHandler::openFile(fs::path const& filepath) -> bool {
                     FS(_F("The file is no valid .xopp file (Version missing): \"{1}\"") % filepath.u8string());
             return false;
         }
-        char versionString[50];
-        zip_fread(versionFp, versionString, 50);
+        char versionString[MAX_VERSION_LENGTH + 1] = {};
+        zip_fread(versionFp, versionString, MAX_VERSION_LENGTH);
         std::string versions(versionString);
         std::regex versionRegex("current=(\\d+?)(?:\n|\r\n)min=(\\d+?)");
         std::smatch match;
@@ -318,7 +323,7 @@ void LoadHandler::parseContents() {
         double width = LoadHandlerHelper::getAttribDouble("width", this);
         double height = LoadHandlerHelper::getAttribDouble("height", this);
 
-        this->page = std::make_unique<XojPage>(width, height);
+        this->page = std::make_unique<XojPage>(width, height, /*suppressLayer*/true);
 
         pages.push_back(this->page);
     } else if (strcmp(elementName, "audio") == 0) {
@@ -902,6 +907,10 @@ void LoadHandler::parserEndElement(GMarkupParseContext* context, const gchar* el
     if (handler->pos == PARSER_POS_STARTED && strcmp(elementName, handler->endRootTag) == 0) {
         handler->pos = PASER_POS_FINISHED;
     } else if (handler->pos == PARSER_POS_IN_PAGE && strcmp(elementName, "page") == 0) {
+        // handle unnecessary layer insertion in case of existing layers in file
+        if (handler->page->getLayerCount() == 0) {
+            handler->page->addLayer(new Layer());
+        }
         handler->pos = PARSER_POS_STARTED;
         handler->page = nullptr;
     } else if (handler->pos == PARSER_POS_IN_LAYER && strcmp(elementName, "layer") == 0) {

@@ -8,6 +8,7 @@
 #include "control/pagetype/PageTypeMenu.h"           // for PageTypeMenu
 #include "control/settings/Settings.h"               // for Settings
 #include "gui/GladeGui.h"                            // for GladeGui
+#include "gui/GladeSearchpath.h"                     // for GladeSearchpath
 #include "gui/ToolitemDragDrop.h"                    // for ToolitemDragDrop
 #include "gui/toolbarMenubar/AbstractToolItem.h"     // for AbstractToolItem
 #include "gui/toolbarMenubar/ColorToolItem.h"        // for ColorToolItem
@@ -18,7 +19,9 @@
 #include "gui/toolbarMenubar/model/ToolbarModel.h"   // for ToolbarModel
 #include "model/Font.h"                              // for XojFont
 #include "util/NamedColor.h"                         // for NamedColor
+#include "util/PathUtil.h"
 #include "util/StringUtils.h"                        // for StringUtils
+#include "util/XojMsgBox.h"
 #include "util/i18n.h"                               // for _
 
 #include "FontButton.h"              // for FontButton
@@ -30,19 +33,22 @@
 #include "ToolPdfCombocontrol.h"     // for ToolPdfCombocontrol
 #include "ToolSelectCombocontrol.h"  // for ToolSelectComboc...
 #include "ToolZoomSlider.h"          // for ToolZoomSlider
+#include "config-dev.h"
 
 using std::string;
 
-ToolMenuHandler::ToolMenuHandler(Control* control, GladeGui* gui, GtkWindow* parent):
-        parent(parent),
+ToolMenuHandler::ToolMenuHandler(Control* control, GladeGui* gui):
+        parent(GTK_WINDOW(gui->getWindow())),
         control(control),
         listener(control),
         zoom(control->getZoomControl()),
         gui(gui),
         toolHandler(control->getToolHandler()),
-        iconNameHelper(control->getSettings()) {
+        tbModel(std::make_unique<ToolbarModel>()),
+        pageBackgroundChangeController(control->getPageBackgroundChangeController()),
+        iconNameHelper(control->getSettings()) {}
 
-    this->tbModel = new ToolbarModel();
+void ToolMenuHandler::populate(const GladeSearchpath* gladeSearchPath) {
     // still owned by Control
     this->newPageType = control->getNewPageType();
     this->newPageType->addApplyBackgroundButton(control->getPageBackgroundChangeController(), false,
@@ -52,12 +58,28 @@ ToolMenuHandler::ToolMenuHandler(Control* control, GladeGui* gui, GtkWindow* par
     this->pageBackgroundChangeController = control->getPageBackgroundChangeController();
 
     initToolItems();
+
+    auto file = gladeSearchPath->findFile("", "toolbar.ini");
+    if (!tbModel->parse(file, true)) {
+
+        string msg = FS(_F("Could not parse general toolbar.ini file: {1}\n"
+                           "No Toolbars will be available") %
+                        file.u8string());
+        XojMsgBox::showErrorToUser(control->getGtkWindow(), msg);
+    }
+
+    file = Util::getConfigFile(TOOLBAR_CONFIG);
+    if (fs::exists(file)) {
+        if (!tbModel->parse(file, false)) {
+            string msg = FS(_F("Could not parse custom toolbar.ini file: {1}\n"
+                               "Toolbars will not be available") %
+                            file.u8string());
+            XojMsgBox::showErrorToUser(control->getGtkWindow(), msg);
+        }
+    }
 }
 
 ToolMenuHandler::~ToolMenuHandler() {
-    delete this->tbModel;
-    this->tbModel = nullptr;
-
     // Owned by control
     this->pageBackgroundChangeController = nullptr;
 
@@ -408,7 +430,6 @@ void ToolMenuHandler::initToolItems() {
                      _("Rotation Snapping"));
     addCustomItemTgl("GRID_SNAPPING", ACTION_GRID_SNAPPING, GROUP_GRID_SNAPPING, false, "snapping-grid",
                      _("Grid Snapping"));
-    addCustomItemTgl("SETSQUARE", ACTION_SETSQUARE, GROUP_SETSQUARE, false, "setsquare", _("Setsquare"));
 
     /*
      * Menu View
@@ -467,7 +488,15 @@ void ToolMenuHandler::initToolItems() {
      */
 
     initPenToolItem();
+    // Add individual line stylues as toolbar items
+    addCustomItemTgl("PLAIN", ACTION_TOOL_LINE_STYLE_PLAIN, GROUP_LINE_STYLE, true, "line-style-plain", _("standard"));
+    addCustomItemTgl("DASHED", ACTION_TOOL_LINE_STYLE_DASH, GROUP_LINE_STYLE, true, "line-style-dash", _("dashed"));
+    addCustomItemTgl("DASH-/ DOTTED", ACTION_TOOL_LINE_STYLE_DASH_DOT, GROUP_LINE_STYLE, true, "line-style-dash-dot",
+                     _("dash-/ dotted"));
+    addCustomItemTgl("DOTTED", ACTION_TOOL_LINE_STYLE_DOT, GROUP_LINE_STYLE, true, "line-style-dot", _("dotted"));
+
     initEraserToolItem();
+    // no icons for individual eraser modes available, therefore can't add them as toolbar items
 
     addCustomItemTgl("HIGHLIGHTER", ACTION_TOOL_HIGHLIGHTER, GROUP_TOOL, true, "tool-highlighter", _("Highlighter"));
 
@@ -492,12 +521,15 @@ void ToolMenuHandler::initToolItems() {
     addCustomItemTgl("DRAW_SPLINE", ACTION_TOOL_DRAW_SPLINE, GROUP_RULER, false, "draw-spline", _("Draw Spline"));
 
     addCustomItemTgl("SELECT_REGION", ACTION_TOOL_SELECT_REGION, GROUP_TOOL, true, "select-lasso", _("Select Region"));
-    addCustomItemTgl("SELECT_RECTANGLE", ACTION_TOOL_SELECT_RECT, GROUP_TOOL, true, "select-rect",
-                     _("Select Rectangle"));
+    addCustomItemTgl("SELECT_RECTANGLE", ACTION_TOOL_SELECT_RECT, GROUP_TOOL, true, "select-rect", _("Select Rectangle"));
+    addCustomItemTgl("SELECT_MULTILAYER_REGION", ACTION_TOOL_SELECT_MULTILAYER_REGION, GROUP_TOOL, true, "select-multilayer-lasso", _("Select Multi-Layer Region"));
+    addCustomItemTgl("SELECT_MULTILAYER_RECTANGLE", ACTION_TOOL_SELECT_MULTILAYER_RECT, GROUP_TOOL, true, "select-multilayer-rect", _("Select Multi-Layer Rect"));
     addCustomItemTgl("SELECT_OBJECT", ACTION_TOOL_SELECT_OBJECT, GROUP_TOOL, true, "object-select", _("Select Object"));
     addCustomItemTgl("VERTICAL_SPACE", ACTION_TOOL_VERTICAL_SPACE, GROUP_TOOL, true, "spacer", _("Vertical Space"));
     addCustomItemTgl("PLAY_OBJECT", ACTION_TOOL_PLAY_OBJECT, GROUP_TOOL, true, "object-play", _("Play Object"));
     addCustomItemTgl("HAND", ACTION_TOOL_HAND, GROUP_TOOL, true, "hand", _("Hand"));
+    addCustomItemTgl("SETSQUARE", ACTION_SETSQUARE, GROUP_GEOMETRY_TOOL, false, "setsquare", _("Setsquare"));
+    addCustomItemTgl("COMPASS", ACTION_COMPASS, GROUP_GEOMETRY_TOOL, false, "compass", _("Compass"));
 
     fontButton = new FontButton(listener, gui, "SELECT_FONT", ACTION_FONT_BUTTON_CHANGED, _("Select Font"));
     addToolItem(fontButton);
@@ -594,7 +626,7 @@ void ToolMenuHandler::setPageInfo(const size_t pagecount, const size_t pdfpage) 
     this->toolPageSpinner->setPageInfo(pagecount, pdfpage);
 }
 
-auto ToolMenuHandler::getModel() -> ToolbarModel* { return this->tbModel; }
+auto ToolMenuHandler::getModel() -> ToolbarModel* { return this->tbModel.get(); }
 
 auto ToolMenuHandler::getControl() -> Control* { return this->control; }
 
@@ -609,6 +641,10 @@ auto ToolMenuHandler::isColorInUse(Color color) -> bool {
 }
 
 auto ToolMenuHandler::getToolItems() -> std::vector<AbstractToolItem*>* { return &this->toolItems; }
+
+auto ToolMenuHandler::getColorToolItems() const -> const std::vector<ColorToolItem*>& {
+    return this->toolbarColorItems;
+}
 
 void ToolMenuHandler::disableAudioPlaybackButtons() {
     setAudioPlaybackPaused(false);

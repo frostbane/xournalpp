@@ -115,7 +115,12 @@ auto PageBackgroundChangeController::commitPageTypeChange(const size_t pageNum, 
     PageType origType = page->getBackgroundType();
 
     // Apply the new background
-    applyPageBackground(page, pageType);
+    if (pageType.format != PageTypeFormat::Copy) {
+        applyPageBackground(page, pageType);
+    } else {
+        g_warning("Found 'Copy' page type. Doing nothing™.");
+    }
+
 
     control->firePageChanged(pageNr);
     control->updateBackgroundSizeButton();
@@ -260,7 +265,7 @@ void PageBackgroundChangeController::copyBackgroundFromOtherPage(PageRef target,
     }
 }
 
-void PageBackgroundChangeController::insertNewPage(size_t position) {
+void PageBackgroundChangeController::insertNewPage(size_t position, bool shouldScrollToPage) {
     control->clearSelectionEndText();
 
     Document* doc = control->getDocument();
@@ -293,7 +298,7 @@ void PageBackgroundChangeController::insertNewPage(size_t position) {
         }
     }
 
-    control->insertPage(page, position);
+    control->insertPage(page, position, shouldScrollToPage);
 }
 
 void PageBackgroundChangeController::documentChanged(DocumentChangeType type) {}

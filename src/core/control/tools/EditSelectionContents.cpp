@@ -3,6 +3,7 @@
 #include <algorithm>  // for min, max, transform
 #include <cmath>      // for abs, isnan
 #include <iterator>   // for back_insert_iterator
+#include <limits>     // for numeric_limits
 #include <memory>     // for make_unique, __shar...
 
 #include <glib.h>  // for g_idle_add, g_sourc...
@@ -15,7 +16,7 @@
 #include "model/Element.h"                        // for Element, Element::I...
 #include "model/Layer.h"                          // for Layer
 #include "model/LineStyle.h"                      // for LineStyle
-#include "model/Stroke.h"                         // for Stroke, STROKE_TOOL...
+#include "model/Stroke.h"                         // for Stroke, StrokeTool...
 #include "model/Text.h"                           // for Text
 #include "model/XojPage.h"                        // for XojPage
 #include "undo/ColorUndoAction.h"                 // for ColorUndoAction
@@ -316,7 +317,9 @@ void EditSelectionContents::fillUndoItem(DeleteUndoAction* undo) {
     // and owned by the selection, therefore the layer
     // doesn't know the index anymore
     int index = layer->getElements().size();
-    for (Element* e: this->selected) { undo->addElement(layer, e, index); }
+    for (Element* e: this->selected) {
+        undo->addElement(layer, e, index);
+    }
 
     this->selected.clear();
     this->insertOrder.clear();
@@ -360,7 +363,7 @@ void EditSelectionContents::finalizeSelection(Rectangle<double> bounds, Rectangl
         fy = f;
     }
     bool scale = (bounds.width != this->originalBounds.width || bounds.height != this->originalBounds.height);
-    bool rotate = (std::abs(this->rotation) > __DBL_EPSILON__);
+    bool rotate = (std::abs(this->rotation) > std::numeric_limits<double>::epsilon());
 
     double mx = bounds.x - this->originalBounds.x;
     double my = bounds.y - this->originalBounds.y;
@@ -392,7 +395,9 @@ auto EditSelectionContents::getOriginalX() const -> double { return this->origin
 
 auto EditSelectionContents::getOriginalY() const -> double { return this->originalBounds.y; }
 
-auto EditSelectionContents::getOriginalBounds() const -> Rectangle<double> { return Rectangle<double>{this->originalBounds}; }
+auto EditSelectionContents::getOriginalBounds() const -> Rectangle<double> {
+    return Rectangle<double>{this->originalBounds};
+}
 
 auto EditSelectionContents::getSourceView() -> XojPageView* { return this->sourceView; }
 
@@ -415,7 +420,7 @@ void EditSelectionContents::updateContent(Rectangle<double> bounds, Rectangle<do
         fy = f;
     }
 
-    bool rotate = (std::abs(this->rotation - this->lastRotation) > __DBL_EPSILON__);
+    bool rotate = (std::abs(this->rotation - this->lastRotation) > std::numeric_limits<double>::epsilon());
     bool scale = (snappedBounds.width != this->lastSnappedBounds.width ||
                   snappedBounds.height != this->lastSnappedBounds.height);
 
@@ -491,7 +496,7 @@ void EditSelectionContents::paint(cairo_t* cr, double x, double y, double rotati
         this->relativeY = y;
     }
 
-    if (std::abs(rotation) > __DBL_EPSILON__) {
+    if (std::abs(rotation) > std::numeric_limits<double>::epsilon()) {
         this->rotation = rotation;
     }
 
@@ -525,7 +530,7 @@ void EditSelectionContents::paint(cairo_t* cr, double x, double y, double rotati
     double sx = static_cast<double>(wTarget) / wImg;
     double sy = static_cast<double>(hTarget) / hImg;
 
-    if (wTarget != wImg || hTarget != hImg || std::abs(rotation) > __DBL_EPSILON__) {
+    if (wTarget != wImg || hTarget != hImg || std::abs(rotation) > std::numeric_limits<double>::epsilon()) {
         if (!this->rescaleId) {
             this->rescaleId = g_idle_add(reinterpret_cast<GSourceFunc>(repaintSelection), this);
         }
@@ -539,25 +544,6 @@ void EditSelectionContents::paint(cairo_t* cr, double x, double y, double rotati
     cairo_paint(cr);
 
     cairo_restore(cr);
-}
-
-auto EditSelectionContents::copySelection(PageRef page, XojPageView* view, double x, double y) -> UndoAction* {
-    Layer* layer = page->getSelectedLayer();
-
-    vector<Element*> new_elems;
-
-    for (Element* e: getElements()) {
-        Element* ec = e->clone();
-
-        ec->move(x - this->originalBounds.x, y - this->originalBounds.y);
-
-        layer->addElement(ec);
-        new_elems.push_back(ec);
-    }
-
-    view->rerenderPage();
-
-    return new InsertsUndoAction(page, layer, new_elems);
 }
 
 void EditSelectionContents::serialize(ObjectOutputStream& out) const {

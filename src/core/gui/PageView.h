@@ -11,22 +11,24 @@
 
 #pragma once
 
-#include <memory>  // for unique_ptr
-#include <mutex>   // for mutex
-#include <string>  // for string
-#include <vector>  // for vector
+#include <cstddef>  // for size_t
+#include <memory>   // for unique_ptr, shared_ptr
+#include <mutex>    // for mutex
+#include <string>   // for string
+#include <vector>   // for vector
 
-#include <cairo.h>    // for cairo_t, cairo_surface_t
-#include <gdk/gdk.h>  // for GdkEventKey, GdkRectangle, GdkEventB...
+#include <cairo.h>    // for cairo_t
+#include <gdk/gdk.h>  // for GdkEventKey, GdkRGBA, GdkRectangle
+#include <gtk/gtk.h>  // for GtkWidget
 
 #include "model/PageListener.h"       // for PageListener
 #include "model/PageRef.h"            // for PageRef
 #include "util/Rectangle.h"           // for Rectangle
-#include "util/raii/CairoWrappers.h"  // for CairoSurfaceSPtr, CairoSPtr
-#include "view/Repaintable.h"
+#include "util/raii/CairoWrappers.h"  // for CairoSurfaceSPtr
+#include "view/Repaintable.h"         // for Repaintable
 
-#include "Layout.h"      // for Layout
-#include "LegacyRedrawable.h"  // for Redrawable
+#include "Layout.h"            // for Layout
+#include "LegacyRedrawable.h"  // for LegacyRedrawable
 
 class EraseHandler;
 class InputHandler;
@@ -41,6 +43,8 @@ class Element;
 class PositionInputData;
 class Range;
 class TexImage;
+class XojPdfRectangle;
+class XojPdfPage;
 
 namespace xoj::view {
 class OverlayView;
@@ -53,6 +57,7 @@ public:
     ~XojPageView() override;
 
 public:
+    void addOverlayView(std::unique_ptr<xoj::view::OverlayView>);
     void rerenderPage() override;
     void rerenderRect(double x, double y, double width, double height) override;
 
@@ -74,6 +79,7 @@ public:
 
     int getDPIScaling() const override;
     double getZoom() const override;
+    ZoomControl* getZoomControl() const override;
     Range getVisiblePart() const override;
 
     double getWidth() const override;
@@ -88,6 +94,8 @@ public:
     bool isSelected() const;
 
     void endText();
+
+    void endSpline();
 
     bool searchTextOnPage(const std::string& text, size_t* occurrences, double* yOfUpperMostMatch);
 
@@ -174,6 +182,7 @@ public:  // event handler
     bool onButtonTriplePressEvent(const PositionInputData& pos);
     bool onMotionNotifyEvent(const PositionInputData& pos);
     void onSequenceCancelEvent();
+    void onTapEvent(const PositionInputData& pos);
 
     /**
      * This event fires after onButtonPressEvent and also
@@ -192,13 +201,32 @@ public:  // listener
     void rangeChanged(Range& range) override;
     void pageChanged() override;
     void elementChanged(Element* elem) override;
+    void elementsChanged(const std::vector<Element*>& elements, const Range& range) override;
 
 private:
     void startText(double x, double y);
 
-    void addRerenderRect(double x, double y, double width, double height);
-
     void drawLoadingPage(cairo_t* cr);
+
+    /**
+     * @brief Make and display a popover dialog near the given location.
+     *
+     * @param rect specifies the location of the dialog.
+     * @param child is added to the dialog before displaying.
+     * @returns a pointer to the popover dialog.
+     */
+    GtkWidget* makePopover(const XojPdfRectangle& rect, GtkWidget* child);
+
+    /**
+     * @brief Display a popover with link-related actions, if one
+     *  is at a given location on the page.
+     *
+     * @param page is the current page
+     * @param targetX
+     * @param targetY the link must contain (targetX, targetY)
+     * @returns true iff a URI link exists near/at (targetX, targetY) => a popover was shown
+     */
+    bool displayLinkPopover(std::shared_ptr<XojPdfPage> page, double targetX, double targetY);
 
     void setX(int x);
     void setY(int y);
@@ -261,7 +289,7 @@ private:
     /**
      * Unixtimestam when the page was last time in the visible area
      */
-    int lastVisibleTime = -1;
+    long int lastVisibleTime = -1;
 
     std::mutex repaintRectMutex;
     std::vector<xoj::util::Rectangle<double>> rerenderRects;

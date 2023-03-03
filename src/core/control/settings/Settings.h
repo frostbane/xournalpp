@@ -17,6 +17,7 @@
 #include <string>   // for string, basic_string
 #include <utility>  // for pair
 #include <vector>   // for vector
+#include <array>    // for array
 
 #include <gdk/gdk.h>                      // for GdkInputSource, GdkD...
 #include <glib.h>                         // for gchar, gboolean, gint
@@ -30,6 +31,7 @@
 #include "LatexSettings.h"  // for LatexSettings
 #include "SettingsEnums.h"  // for InputDeviceTypeOption
 #include "filesystem.h"     // for path
+#include "ViewModes.h"      // for ViewModes
 
 struct Palette;
 
@@ -118,7 +120,12 @@ private:
     void loadButtonConfig();
 
 public:
+    // View Mode
+    bool loadViewMode(ViewModeId mode);
+
     // Getter- / Setter
+    const std::vector<ViewMode>& getViewModes() const;
+
     bool isPressureSensitivity() const;
     void setPressureSensitivity(gboolean presureSensitivity);
 
@@ -203,6 +210,9 @@ public:
     int getMainWndHeight() const;
     bool isMainWndMaximized() const;
 
+    bool isFullscreen() const;
+    void setIsFullscreen(bool isFullscreen);
+
     bool isSidebarVisible() const;
     void setSidebarVisible(bool visible);
 
@@ -232,6 +242,9 @@ public:
 
     void setPairsOffset(int numOffset);
     int getPairsOffset() const;
+
+    void setEmptyLastPageAppend(EmptyLastPageAppendType emptyLastPageAppend);
+    EmptyLastPageAppendType getEmptyLastPageAppend() const;
 
     void setViewColumns(int numColumns);
     int getViewColumns() const;
@@ -331,13 +344,14 @@ public:
     std::string const& getDefaultSaveName() const;
     void setDefaultSaveName(const std::string& name);
 
-    ButtonConfig* getButtonConfig(int id);
+    std::string const& getDefaultPdfExportName() const;
+
+    ButtonConfig* getButtonConfig(unsigned int id);
 
     std::string const& getFullscreenHideElements() const;
     void setFullscreenHideElements(std::string elements);
 
-    std::string const& getPresentationHideElements() const;
-    void setPresentationHideElements(std::string elements);
+    void setViewMode(ViewModeId mode, ViewMode ViewMode);
 
     Color getBorderColor() const;
     void setBorderColor(Color color);
@@ -584,6 +598,11 @@ private:
     bool zoomGesturesEnabled{};
 
     /**
+     *  If fullscreen is active
+     */
+    bool fullscreenActive{};
+
+    /**
      *  If the sidebar is visible
      */
     bool showSidebar{};
@@ -758,6 +777,11 @@ private:
     int numPairsOffset{};
 
     /**
+     * Preference for appending an empty last page to the document
+     */
+    EmptyLastPageAppendType emptyLastPageAppend{};
+
+    /**
      *  Use when fixed number of columns
      */
     int numColumns{};
@@ -852,17 +876,18 @@ private:
      */
     std::string defaultSaveName;  // should be string - don't change to path
 
+    std::string defaultPdfExportName;
+
     /**
      * The button config
      */
-    ButtonConfig* buttonConfig[BUTTON_COUNT]{};
+    std::array<std::unique_ptr<ButtonConfig>, BUTTON_COUNT> buttonConfig;
 
     /**
-     * Which gui elements are hidden if you are in Fullscreen mode,
-     * separated by a colon (,)
+     * View-modes. Predefined: 0=default, 1=fullscreen, 2=presentation
      */
-    std::string fullscreenHideElements;
-    std::string presentationHideElements;
+    ViewModeId activeViewMode;
+    std::vector<ViewMode> viewModes;
 
     /**
      *  The count of pages which will be cached

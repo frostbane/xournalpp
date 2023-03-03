@@ -64,7 +64,7 @@ EditSelection::EditSelection(UndoRedoHandler* undo, const PageRef& page, XojPage
 
 EditSelection::EditSelection(UndoRedoHandler* undo, Selection* selection, XojPageView* view):
         snappingHandler(view->getXournal()->getControl()->getSettings()) {
-    calcSizeFromElements(selection->selectedElements);
+    Range r = calcSizeFromElements(selection->selectedElements);
 
     construct(undo, view, view->getPage());
 
@@ -80,7 +80,7 @@ EditSelection::EditSelection(UndoRedoHandler* undo, Selection* selection, XojPag
         this->sourceLayer->removeElement(e, false);
     }
 
-    view->rerenderPage();
+    view->rerenderRange(r);
 }
 
 EditSelection::EditSelection(UndoRedoHandler* undo, Element* e, XojPageView* view, const PageRef& page):
@@ -97,7 +97,7 @@ EditSelection::EditSelection(UndoRedoHandler* undo, Element* e, XojPageView* vie
 EditSelection::EditSelection(UndoRedoHandler* undo, const vector<Element*>& elements, XojPageView* view,
                              const PageRef& page):
         snappingHandler(view->getXournal()->getControl()->getSettings()) {
-    calcSizeFromElements(elements);
+    Range r = calcSizeFromElements(elements);
     construct(undo, view, page);
 
     for (Element* e: elements) {
@@ -105,13 +105,13 @@ EditSelection::EditSelection(UndoRedoHandler* undo, const vector<Element*>& elem
         this->sourceLayer->removeElement(e, false);
     }
 
-    view->rerenderPage();
+    view->rerenderRange(r);
 }
 
 EditSelection::EditSelection(UndoRedoHandler* undo, XojPageView* view, const PageRef& page, Layer* layer):
         snappingHandler(view->getXournal()->getControl()->getSettings()) {
     const auto& elements = layer->getElements();
-    calcSizeFromElements(elements);
+    Range r = calcSizeFromElements(elements);
     construct(undo, view, page);
 
     long i = 0L;
@@ -122,17 +122,17 @@ EditSelection::EditSelection(UndoRedoHandler* undo, XojPageView* view, const Pag
 
     layer->clearNoFree();
 
-    view->rerenderPage();
+    view->rerenderRange(r);
 }
 
-void EditSelection::calcSizeFromElements(vector<Element*> elements) {
+auto EditSelection::calcSizeFromElements(vector<Element*> elements) -> Range {
     if (elements.empty()) {
         x = 0;
         y = 0;
         width = 0;
         height = 0;
         snappedBounds = Rectangle<double>{};
-        return;
+        return Range();
     }
 
     Element* first = elements.front();
@@ -153,6 +153,7 @@ void EditSelection::calcSizeFromElements(vector<Element*> elements) {
     height = range.getHeight() + 3 * this->btnWidth;
 
     snappedBounds = rect;
+    return range;
 }
 
 void EditSelection::construct(UndoRedoHandler* undo, XojPageView* view, const PageRef& sourcePage) {
@@ -967,7 +968,7 @@ void EditSelection::paint(cairo_t* cr, double zoom) {
     double y = this->y;
 
 
-    if (std::abs(this->rotation) > __DBL_EPSILON__) {
+    if (std::abs(this->rotation) > std::numeric_limits<double>::epsilon()) {
         this->rotation = snappingHandler.snapAngle(this->rotation, false);
 
 
@@ -1009,36 +1010,38 @@ void EditSelection::paint(cairo_t* cr, double zoom) {
     gdk_cairo_set_source_rgba(cr, &applied);
     cairo_fill(cr);
 
-    cairo_set_dash(cr, nullptr, 0, 0);
+    ToolHandler* toolHandler = view->getXournal()->getControl()->getToolHandler();
+    if (toolHandler->getToolType() != TOOL_HAND) {
+        cairo_set_dash(cr, nullptr, 0, 0);
+        if (!this->aspectRatio) {
+            // top
+            drawAnchorRect(cr, x + width / 2, y, zoom);
+            // bottom
+            drawAnchorRect(cr, x + width / 2, y + height, zoom);
+            // left
+            drawAnchorRect(cr, x, y + height / 2, zoom);
+            // right
+            drawAnchorRect(cr, x + width, y + height / 2, zoom);
 
-    if (!this->aspectRatio) {
-        // top
-        drawAnchorRect(cr, x + width / 2, y, zoom);
-        // bottom
-        drawAnchorRect(cr, x + width / 2, y + height, zoom);
-        // left
-        drawAnchorRect(cr, x, y + height / 2, zoom);
-        // right
-        drawAnchorRect(cr, x + width, y + height / 2, zoom);
-
-        if (supportRotation) {
-            // rotation handle
-            drawAnchorRotation(cr, std::min(x, x + width) + std::abs(width) + (ROTATE_PADDING + this->btnWidth) / zoom,
-                               y + height / 2, zoom);
+            if (supportRotation) {
+                // rotation handle
+                drawAnchorRotation(cr,
+                                   std::min(x, x + width) + std::abs(width) + (ROTATE_PADDING + this->btnWidth) / zoom,
+                                   y + height / 2, zoom);
+            }
         }
+
+        // top left
+        drawAnchorRect(cr, x, y, zoom);
+        // top right
+        drawAnchorRect(cr, x + width, y, zoom);
+        // bottom left
+        drawAnchorRect(cr, x, y + height, zoom);
+        // bottom right
+        drawAnchorRect(cr, x + width, y + height, zoom);
+
+        drawDeleteRect(cr, std::min(x, x + width) - (DELETE_PADDING + this->btnWidth) / zoom, y, zoom);
     }
-
-    // top left
-    drawAnchorRect(cr, x, y, zoom);
-    // top right
-    drawAnchorRect(cr, x + width, y, zoom);
-    // bottom left
-    drawAnchorRect(cr, x, y + height, zoom);
-    // bottom right
-    drawAnchorRect(cr, x + width, y + height, zoom);
-
-
-    drawDeleteRect(cr, std::min(x, x + width) - (DELETE_PADDING + this->btnWidth) / zoom, y, zoom);
 }
 
 void EditSelection::drawAnchorRotation(cairo_t* cr, double x, double y, double zoom) {

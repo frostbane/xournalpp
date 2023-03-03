@@ -12,9 +12,7 @@
 #include "util/serializing/HexObjectEncoding.h"
 #include "util/serializing/ObjectInputStream.h"
 #include "util/serializing/ObjectOutputStream.h"
-
-extern const char* XML_VERSION_STR;
-
+#include "util/serializing/Serializable.h"
 
 template <typename T, unsigned N>
 std::string serializeData(const std::array<T, N>& data) {
@@ -269,7 +267,7 @@ TEST(UtilObjectIOStream, testReadComplexObject) {
 
             stream.endObject();
         }
-    } catch (InputStreamException& e) {
+    } catch (const InputStreamException& e) {
         std::cerr << "InputStreamException testing complex object: " << e.what() << std::endl;
         FAIL();
     }
@@ -344,7 +342,7 @@ TEST(UtilObjectIOStream, testReadStroke) {
             assertStrokeEquality(stroke, in_stroke);
             ++i;
         }
-    } catch (InputStreamException& e) {
+    } catch (const InputStreamException& e) {
         std::cerr << "InputStreamException testing stroke " << i << ": " << e.what() << std::endl;
         FAIL();
     }

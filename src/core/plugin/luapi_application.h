@@ -12,6 +12,7 @@
 
 #include <climits>
 #include <cstring>
+#include <limits>  // for numeric_limits
 #include <map>
 
 #include <gtk/gtk.h>
@@ -245,7 +246,7 @@ static int applib_registerUi(lua_State* L) {
     const char* accelerator = luaL_optstring(L, -4, nullptr);
     const char* menu = luaL_optstring(L, -3, nullptr);
     const char* callback = luaL_optstring(L, -2, nullptr);
-    const long mode = luaL_optinteger(L, -1, LONG_MAX);
+    const long mode = luaL_optinteger(L, -1, std::numeric_limits<long>::max());
     if (callback == nullptr) {
         luaL_error(L, "Missing callback function!");
     }
@@ -323,12 +324,10 @@ static int applib_uiAction(lua_State* L) {
     }
 
     ActionType action = ActionType_fromString(actionStr);
-    GdkEvent* event = nullptr;
-    GtkMenuItem* menuitem = nullptr;
     GtkToolButton* toolbutton = nullptr;
 
     Control* ctrl = plugin->getControl();
-    ctrl->actionPerformed(action, group, event, menuitem, toolbutton, enabled);
+    ctrl->actionPerformed(action, group, toolbutton, enabled);
 
     // Make sure to remove all vars which are put to the stack before!
     lua_pop(L, 3);
@@ -921,10 +920,12 @@ static int applib_getStrokes(lua_State* L) {
             StrokeTool tool = s->getToolType();
             if (tool == StrokeTool::PEN) {
                 lua_pushstring(L, "pen");
+            } else if (tool == StrokeTool::ERASER) {
+                lua_pushstring(L, "eraser");
             } else if (tool == StrokeTool::HIGHLIGHTER) {
                 lua_pushstring(L, "highlighter");
             } else {
-                g_warning("Unknown STROKE_TOOL. ");
+                g_warning("Unknown StrokeTool::Value");
                 return 0;
             }
             lua_setfield(L, -2, "tool");  // add tool to stroke

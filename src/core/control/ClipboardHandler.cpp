@@ -42,6 +42,12 @@ ClipboardHandler::~ClipboardHandler() { g_signal_handler_disconnect(this->clipbo
 static GdkAtom atomXournal = gdk_atom_intern_static_string("application/xournal");
 
 auto ClipboardHandler::paste() -> bool {
+    /* Request targets again, since the owner-change signal is not emitted on MacOS and under X11 with no XFIXES
+     * extension. See https://docs.gtk.org/gdk3/struct.EventOwnerChange.html and
+     * https://gitlab.gnome.org/GNOME/gtk/-/issues/1757 */
+    gtk_clipboard_request_contents(clipboard, gdk_atom_intern_static_string("TARGETS"),
+                                   reinterpret_cast<GtkClipboardReceivedFunc>(receivedClipboardContents), this);
+
     if (this->containsXournal) {
         gtk_clipboard_request_contents(this->clipboard, atomXournal,
                                        reinterpret_cast<GtkClipboardReceivedFunc>(pasteClipboardContents), this);
@@ -174,7 +180,7 @@ auto ClipboardHandler::copy() -> bool {
     cairo_t* crPng = cairo_create(surfacePng);
     cairo_scale(crPng, dpiFactor, dpiFactor);
 
-    cairo_translate(crPng, -selection->getXOnView(), -selection->getYOnView());
+    cairo_translate(crPng, -selection->getOriginalXOnView(), -selection->getOriginalYOnView());
 
     xoj::view::ElementContainerView view(this->selection);
     view.draw(xoj::view::Context::createDefault(crPng));
@@ -196,6 +202,7 @@ auto ClipboardHandler::copy() -> bool {
                                                 selection->getWidth(), selection->getHeight());
     cairo_t* crSVG = cairo_create(surfaceSVG);
 
+    cairo_translate(crSVG, -selection->getOriginalXOnView(), -selection->getOriginalYOnView());
     view.draw(xoj::view::Context::createDefault(crSVG));
 
     cairo_surface_destroy(surfaceSVG);
@@ -242,7 +249,7 @@ void ClipboardHandler::setSelection(EditSelection* selection) {
     this->listener->clipboardCutCopyEnabled(selection != nullptr);
 }
 
-void ClipboardHandler::setCopyPasteEnabled(bool enabled) {
+void ClipboardHandler::setCopyCutEnabled(bool enabled) {
     if (enabled) {
         listener->clipboardCutCopyEnabled(true);
     } else if (!selection) {
@@ -262,7 +269,11 @@ void ClipboardHandler::clipboardUpdated(GdkAtom atom) {
 }
 
 void ClipboardHandler::pasteClipboardImage(GtkClipboard* clipboard, GdkPixbuf* pixbuf, ClipboardHandler* handler) {
-    handler->listener->clipboardPasteImage(pixbuf);
+    if (pixbuf) {
+        handler->listener->clipboardPasteImage(pixbuf);
+    } else {
+        g_warning("Trying to paste image, but pixbuf is null");
+    }
 }
 
 void ClipboardHandler::pasteClipboardContents(GtkClipboard* clipboard, GtkSelectionData* selectionData,

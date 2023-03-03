@@ -2,10 +2,10 @@
 
 #include <algorithm>  // for min, max, copy
 #include <cassert>    // for assert
-#include <cfloat>     // for DBL_MAX, DBL_MIN
 #include <cinttypes>  // for uint64_t
 #include <cmath>      // for abs, hypot, sqrt
 #include <iterator>   // for back_insert_iterator
+#include <limits>     // for numeric_limits
 #include <numeric>    // for accumulate
 #include <optional>   // for optional, nullopt
 #include <string>     // for to_string, operator<<
@@ -240,28 +240,12 @@ auto Stroke::isInSelection(ShapeContainer* container) const -> bool {
     return true;
 }
 
-void Stroke::setFirstPoint(double x, double y) {
-    if (!this->points.empty()) {
-        Point& p = this->points.front();
-        p.x = x;
-        p.y = y;
-        this->sizeCalculated = false;
-    }
-}
-
-void Stroke::setLastPoint(double x, double y) { setLastPoint({x, y}); }
-
-void Stroke::setLastPoint(const Point& p) {
-    if (!this->points.empty()) {
-        this->points.back() = p;
-        this->sizeCalculated = false;
-    }
-}
-
 void Stroke::addPoint(const Point& p) {
     this->points.emplace_back(p);
-    updateBounds(Element::x, Element::y, Element::width, Element::height, Element::snappedBounds, p,
-                 hasPressure() ? p.z / 2.0 : this->width / 2.0);
+    if (sizeCalculated) {
+        updateBounds(Element::x, Element::y, Element::width, Element::height, Element::snappedBounds, p,
+                     hasPressure() ? p.z / 2.0 : this->width / 2.0);
+    }
 }
 
 auto Stroke::getPointCount() const -> int { return this->points.size(); }
@@ -290,14 +274,9 @@ Point Stroke::getPoint(PathParameter parameter) const {
     assert(parameter.isValid() && parameter.index < this->points.size() - 1);
 
     const Point& p = this->points[parameter.index];
-    if (parameter.index == this->points.size() - 2) {
-        // Need to handle the pressure value separately, since the last pressure value of a stroke is not set.
-        Point q = this->points[parameter.index + 1];
-        q.z = p.z;
-        return p.relativeLineTo(q, parameter.t);
-    }
-    const Point& q = this->points[parameter.index + 1];
-    return p.relativeLineTo(q, parameter.t);
+    Point res = p.relativeLineTo(this->points[parameter.index + 1], parameter.t);
+    res.z = p.z;  // The point's width should be that of the segment's first point
+    return res;
 }
 
 auto Stroke::getPoints() const -> const Point* { return this->points.data(); }
@@ -400,15 +379,15 @@ void Stroke::scalePressure(double factor) {
         return;
     }
     for (auto&& p: this->points) { p.z *= factor; }
-}
-
-void Stroke::clearPressure() {
-    for (auto&& p: points) { p.z = Point::NO_PRESSURE; }
+    this->sizeCalculated = false;
 }
 
 void Stroke::setLastPressure(double pressure) {
     if (!this->points.empty()) {
-        this->points.back().z = pressure;
+        assert(pressure != Point::NO_PRESSURE);
+        Point& back = this->points.back();
+        back.z = pressure;
+        updateBounds(Element::x, Element::y, Element::width, Element::height, snappedBounds, back, 0.5 * pressure);
     }
 }
 
@@ -818,10 +797,10 @@ void Stroke::calcSize() const {
         Element::snappedBounds = Rectangle<double>{};
     }
 
-    double minSnapX = DBL_MAX;
-    double maxSnapX = DBL_MIN;
-    double minSnapY = DBL_MAX;
-    double maxSnapY = DBL_MIN;
+    double minSnapX = std::numeric_limits<double>::max();
+    double maxSnapX = std::numeric_limits<double>::min();
+    double minSnapY = std::numeric_limits<double>::max();
+    double maxSnapY = std::numeric_limits<double>::min();
 
     auto halfThick = 0.0;
 

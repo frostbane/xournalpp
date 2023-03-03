@@ -16,15 +16,12 @@
 #include <cairo.h>
 
 #include "CLibrariesSPtr.h"
+#include "IdentityFunction.h"
 
 namespace xoj::util {
 
 inline namespace raii {
 namespace specialization {
-
-template <typename T>  // Todo(cpp20): replace with std:identity()
-constexpr auto identity = [](T* p) { return p; };
-
 class CairoHandler {
 public:
     constexpr static auto ref = cairo_reference;
@@ -38,10 +35,18 @@ public:
     constexpr static auto unref = cairo_surface_destroy;
     constexpr static auto adopt = identity<cairo_surface_t>;
 };
+
+class CairoRegionHandler {
+public:
+    constexpr static auto ref = cairo_region_reference;
+    constexpr static auto unref = cairo_region_destroy;
+    constexpr static auto adopt = identity<cairo_region_t>;
+};
 };  // namespace specialization
 
 using CairoSPtr = CLibrariesSPtr<cairo_t, raii::specialization::CairoHandler>;
 using CairoSurfaceSPtr = CLibrariesSPtr<cairo_surface_t, raii::specialization::CairoSurfaceHandler>;
+using CairoRegionSPtr = CLibrariesSPtr<cairo_region_t, raii::specialization::CairoRegionHandler>;
 
 /**
  * @brief cairo_save(cr)/cairo_restore(cr) RAII implementation

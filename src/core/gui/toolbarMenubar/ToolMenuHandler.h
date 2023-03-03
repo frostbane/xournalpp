@@ -12,6 +12,7 @@
 #pragma once
 
 #include <cstddef>  // for size_t
+#include <memory>   // for unique_ptr
 #include <string>   // for string
 #include <vector>   // for vector
 
@@ -27,6 +28,7 @@
 class AbstractToolItem;
 class FontButton;
 class GladeGui;
+class GladeSearchpath;
 class ToolbarData;
 class ToolbarModel;
 class ToolButton;
@@ -45,8 +47,10 @@ class MenuItem;
 
 class ToolMenuHandler {
 public:
-    ToolMenuHandler(Control* control, GladeGui* gui, GtkWindow* parent);
+    ToolMenuHandler(Control* control, GladeGui* gui);
     virtual ~ToolMenuHandler();
+
+    void populate(const GladeSearchpath* gladeSearchPath);
 
 public:
     void freeDynamicToolbarItems();
@@ -58,7 +62,7 @@ public:
      *
      * @param d Data Object representing the selected toolbars (e.g Portrait)
      * @param toolbar reference to the widget representing the toolbar
-     * @param toolbarName tollbarName which should be read from the file
+     * @param toolbarName toolbarName which should be read from the file
      * @param horizontal whether the toolbar is horizontal
      */
     void load(ToolbarData* d, GtkWidget* toolbar, const char* toolbarName, bool horizontal);
@@ -86,6 +90,7 @@ public:
     ToolbarModel* getModel();
 
     std::vector<AbstractToolItem*>* getToolItems();
+    const std::vector<ColorToolItem*>& getColorToolItems() const;
 
     Control* getControl();
 
@@ -132,7 +137,7 @@ private:
     GladeGui* gui = nullptr;
     ToolHandler* toolHandler = nullptr;
 
-    ToolbarModel* tbModel = nullptr;
+    std::unique_ptr<ToolbarModel> tbModel;
 
     PageTypeMenu* newPageType = nullptr;
     PageBackgroundChangeController* pageBackgroundChangeController = nullptr;
