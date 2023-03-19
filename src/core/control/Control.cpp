@@ -2189,7 +2189,7 @@ void Control::changeColorOfSelection() {
 
         if (this->toolHandler->getToolType() == TOOL_TEXT && edit != nullptr) {
             // Todo move into selection
-            undoRedo->addUndoAction(UndoActionPtr(edit->setColor(toolHandler->getColor())));
+            edit->setColor(toolHandler->getColor());
         }
     }
 }
@@ -3012,6 +3012,10 @@ void Control::clipboardPaste(Element* e) {
     auto* selection = new EditSelection(this->undoRedo, e, view, page);
 
     win->getXournal()->setSelection(selection);
+}
+
+void Control::registerPluginToolButtons(ToolMenuHandler* toolMenuHandler) {
+    pluginController->registerToolButtons(toolMenuHandler);
 }
 
 void Control::clipboardPasteXournal(ObjectInputStream& in) {

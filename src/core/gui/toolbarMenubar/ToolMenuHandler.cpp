@@ -18,6 +18,7 @@
 #include "gui/toolbarMenubar/model/ToolbarItem.h"    // for ToolbarItem
 #include "gui/toolbarMenubar/model/ToolbarModel.h"   // for ToolbarModel
 #include "model/Font.h"                              // for XojFont
+#include "plugin/Plugin.h"                           // for ToolbarButtonEntr<
 #include "util/NamedColor.h"                         // for NamedColor
 #include "util/PathUtil.h"
 #include "util/StringUtils.h"                        // for StringUtils
@@ -26,6 +27,7 @@
 
 #include "FontButton.h"              // for FontButton
 #include "MenuItem.h"                // for MenuItem
+#include "PluginToolButton.h"        // for ToolButton
 #include "ToolButton.h"              // for ToolButton
 #include "ToolDrawCombocontrol.h"    // for ToolDrawCombocon...
 #include "ToolPageLayer.h"           // for ToolPageLayer
@@ -359,6 +361,13 @@ void ToolMenuHandler::signalConnectCallback(GtkBuilder* builder, GObject* object
         g_error("Unsupported signal handler from glade file: \"%s\" / \"%s\"", signalName, handlerName);
     }
 }
+
+#ifdef ENABLE_PLUGINS
+void ToolMenuHandler::addPluginItem(ToolbarButtonEntry* t) {
+    PluginToolButton* button = new PluginToolButton(listener, t);
+    addToolItem(button);
+}
+#endif /* ENABLE_PLUGINS */
 
 void ToolMenuHandler::initToolItems() {
 
